@@ -5,7 +5,7 @@ from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.vgg19 import VGG19
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.layers import Dense, Flatten, BatchNormalization, Dropout,AveragePooling2D, Convolution2D, ZeroPadding2D
 from sklearn.metrics import classification_report, confusion_matrix
 from PIL import ImageFile
 import numpy as np
@@ -29,18 +29,11 @@ class vgg19_architecture():
    validation_sample: int
    test_sample: int
 
-   def generate_images(self, model_name):
+   def train_network(self, model_name):
       # Inicia as imagens que serao usadas pela rede
       ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-      train_datagen = ImageDataGenerator(featurewise_center=True,
-                                       featurewise_std_normalization=True,
-                                       preprocessing_function=preprocess_input,
-                                       rotation_range=30,
-                                       width_shift_range=0.2,
-                                       height_shift_range=0.2,
-                                       horizontal_flip = True,
-                                       vertical_flip = True)
+      train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
 
 
       val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
@@ -72,20 +65,35 @@ class vgg19_architecture():
       base_model = VGG19(include_top=False,
                         pooling='avg',
                         weights='imagenet',
-                           input_shape=(self.img_width, self.img_height, 3))
+                        input_shape=(self.img_width, self.img_height, 3))
 
       # desabilita o treinamento para hidden layer (ja foram treinados com a imagenet)
-      for layers in base_model.layers:
+      for layers in base_model.layers[:-2]:
                   layers.trainable=False
 
-      last_output = base_model.layers[-1].output
+      last_output = base_model.output
 
       # Modifica a ultima camada da rede (para adequacao aos dados que estao sendo utilizados)
       vgg_x = Flatten()(last_output)
-      vgg_x = Dense(128, activation = 'relu')(vgg_x)
+      vgg_x = BatchNormalization()(vgg_x)
+      vgg_x = Dense(512, activation = 'relu', kernel_initializer='he_uniform')(vgg_x)
+      vgg_x = Dropout(0.3)(vgg_x)
+      vgg_x = BatchNormalization()(vgg_x)
+      vgg_x = Dense(512, activation = 'relu', kernel_initializer='he_uniform')(vgg_x)
+      vgg_x = Dropout(0.3)(vgg_x)
+      vgg_x = BatchNormalization()(vgg_x)
+      vgg_x = Dense(512, activation = 'relu', kernel_initializer='he_uniform')(vgg_x)
+      vgg_x = Dropout(0.3)(vgg_x)
       vgg_x = Dense(self.num_classes, activation = 'softmax')(vgg_x)
-      model = Model(base_model.input, vgg_x)
-      model.compile(loss = 'kullback_leibler_divergence', optimizer= 'adam', metrics=['AUC'])
+      
+      model = Model(inputs=base_model.input, outputs=vgg_x)
+      
+      # loss and metrics
+      model.compile(loss = tf.keras.losses.KLDivergence(), optimizer= 'adam', metrics=[
+      tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+      tf.keras.metrics.Precision(name='precision'),
+      tf.keras.metrics.Recall(name='recall'),  
+      tf.keras.metrics.AUC(name='auc')])
 
       # treina o modelo
       model.fit(train_generator,

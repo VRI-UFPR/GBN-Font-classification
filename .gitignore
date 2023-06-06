@@ -2,3 +2,5 @@
 /datasets
 /architectures/__pycache__
 /models
+/logs
+/calamari

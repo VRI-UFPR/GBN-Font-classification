@@ -21,7 +21,7 @@ Onde são salvos os modelos após o treinamento, seguindo a estrutura "models/{n
 O nome do modelo atualmente segue o padrão "model_id_{id no modelo na planilha de treinamento}.h5"
 
 ### Utils
-Códigos que são podem vir a ser uteis no treinamento das redes.
+Códigos que podem vir a ser uteis no treinamento das redes.
 
 # Como treinar?
 
